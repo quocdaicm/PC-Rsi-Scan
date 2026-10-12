@@ -2,7 +2,7 @@ name: Build Windows EXE
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, master]
 jobs:
   build:
     runs-on: windows-latest
@@ -11,9 +11,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: npm run dist
+      - name: Tim thu muc du an
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Filter *.zip -File | ForEach-Object { Expand-Archive -Path $_.FullName -DestinationPath . -Force }
+          $f = Get-ChildItem -Path . -Recurse -Filter package.json -File | Where-Object { $_.FullName -notmatch 'node_modules' } | Select-Object -First 1
+          if (-not $f) { Get-ChildItem -Recurse | Select-Object -First 60 FullName; throw 'Khong tim thay package.json trong repo' }
+          $dir = $f.DirectoryName -replace '\\','/'
+          Write-Host "Dung thu muc: $dir"
+          "DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Cai thu vien
+        run: npm install
+        working-directory: ${{ env.DIR }}
+      - name: Build file cai
+        run: npm run dist
+        working-directory: ${{ env.DIR }}
       - uses: actions/upload-artifact@v4
         with:
           name: RSI-Windows-Installer
-          path: dist/*.exe
+          path: ${{ env.DIR }}/dist/*.exe
+
